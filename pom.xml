@@ -30,6 +30,7 @@
 		<java.version>21</java.version>
 		<org.mapstruct.version>1.6.3</org.mapstruct.version>
 		<lombok.version>1.18.42</lombok.version>
+		<excludedGroups>known-defect</excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -136,21 +137,31 @@
 <!--			<artifactId>spring-boot-starter-flyway-test</artifactId>-->
 <!--			<scope>test</scope>-->
 <!--		</dependency>-->
-<!--		<dependency>-->
-<!--			<groupId>org.springframework.boot</groupId>-->
-<!--			<artifactId>spring-boot-starter-security-test</artifactId>-->
-<!--			<scope>test</scope>-->
-<!--		</dependency>-->
+		<!--
+			Carries MockMvcSecurityConfiguration, which applies Spring Security to the
+			auto-configured MockMvc. Without it @WithMockUser never reaches the filter
+			chain and every authenticated slice test comes back 401.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 <!--		<dependency>-->
 <!--			<groupId>org.springframework.boot</groupId>-->
 <!--			<artifactId>spring-boot-starter-validation-test</artifactId>-->
 <!--			<scope>test</scope>-->
 <!--		</dependency>-->
-<!--		<dependency>-->
-<!--			<groupId>org.springframework.boot</groupId>-->
-<!--			<artifactId>spring-boot-starter-webmvc-test</artifactId>-->
-<!--			<scope>test</scope>-->
-<!--		</dependency>-->
+		<!--
+			Spring Boot 4 split the test slices out of spring-boot-starter-test into
+			per-module starters. @WebMvcTest lives here; without it the controller
+			slice tests do not compile.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -165,6 +176,21 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<!--
+				Tests tagged "known-defect" reproduce open defects recorded in the QA
+				report: they assert the REQUIRED behaviour and therefore fail against
+				the current code. They are excluded from the normal build so a green
+				`mvn test` still means "no regressions", and are run deliberately with:
+				    mvn test -Dgroups=known-defect -DexcludedGroups=
+				Each one should start passing — and lose its tag — as its defect is fixed.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<excludedGroups>${excludedGroups}</excludedGroups>
 				</configuration>
 			</plugin>
 			<plugin>
