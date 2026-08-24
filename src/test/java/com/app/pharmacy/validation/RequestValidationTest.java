@@ -356,4 +356,93 @@ class RequestValidationTest {
                     .contains("actualDeliveryDate");
         }
     }
+
+    @Nested
+    @DisplayName("Reference-data requests")
+    class ReferenceData {
+
+        @Test
+        @DisplayName("accepts a well-formed customer")
+        void acceptsValidCustomer() {
+            assertThat(violations(new CustomerRequest("Efua Sarpong", "+233240000001", "5 Oxford Street"))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("allows a customer with no address — it is optional")
+        void allowsCustomerWithoutAddress() {
+            assertThat(violations(new CustomerRequest("Efua Sarpong", "+233240000001", null))).isEmpty();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"12345", "not-a-phone", "+233 24 000 0001 000 0000 0000"})
+        @DisplayName("rejects a phone number that is too short, too long, or not numeric")
+        void rejectsBadCustomerPhone(String phone) {
+            assertThat(violatedPaths(new CustomerRequest("Efua Sarpong", phone, null))).contains("phoneNumber");
+        }
+
+        /**
+         * OBS-11 (observation, not a defect). The shared phone pattern
+         * ^[0-9+()\-\s]{7,20}$ constrains the character set and length but not
+         * the structure, so a string of punctuation with no digits at all passes.
+         * The same pattern guards Staff, Customer and Supplier.
+         *
+         * This pins the current behaviour so that tightening the pattern later is
+         * a deliberate, visible change rather than an accidental one.
+         */
+        @Test
+        @DisplayName("accepts punctuation-only input — the phone pattern checks charset, not structure")
+        void phonePatternIsPermissive() {
+            assertThat(violations(new CustomerRequest("Efua Sarpong", "++++++++", null)))
+                    .as("documented as OBS-11; tighten the pattern to change this")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("rejects a blank customer name")
+        void rejectsBlankCustomerName() {
+            assertThat(violatedPaths(new CustomerRequest("  ", "+233240000001", null))).contains("fullName");
+        }
+
+        @Test
+        @DisplayName("requires a prescriber licence number — it is the doctor's natural key")
+        void requiresDoctorLicence() {
+            assertThat(violatedPaths(new DoctorRequest("Dr. Kwame Asante", "  ", null)))
+                    .contains("licenseNumber");
+            assertThat(violations(new DoctorRequest("Dr. Kwame Asante", "MD-4471", null))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("rejects a blank doctor name")
+        void rejectsBlankDoctorName() {
+            assertThat(violatedPaths(new DoctorRequest("", "MD-4471", null))).contains("fullName");
+        }
+
+        @Test
+        @DisplayName("accepts a well-formed supplier")
+        void acceptsValidSupplier() {
+            assertThat(violations(new SupplierRequest("Accra Medical Supplies", "Nii Armah",
+                    "+233300000001", "sales@accramed.test", "12 Ring Road"))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("rejects a malformed supplier email")
+        void rejectsBadSupplierEmail() {
+            assertThat(violatedPaths(new SupplierRequest("Accra Medical Supplies", "Nii Armah",
+                    "+233300000001", "not-an-email", null))).contains("email");
+        }
+
+        @Test
+        @DisplayName("allows a supplier with no email — only the phone number is mandatory")
+        void allowsSupplierWithoutEmail() {
+            assertThat(violations(new SupplierRequest("Accra Medical Supplies", "Nii Armah",
+                    "+233300000001", null, null))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("rejects a blank supplier company name")
+        void rejectsBlankCompanyName() {
+            assertThat(violatedPaths(new SupplierRequest("  ", "Nii Armah",
+                    "+233300000001", null, null))).contains("companyName");
+        }
+    }
 }
